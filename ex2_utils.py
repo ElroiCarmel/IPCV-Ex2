@@ -18,7 +18,7 @@ def conv1D(inSignal: np.ndarray, kernel1: np.ndarray) -> np.ndarray:
             ans[i] += inSignal[j] * kernel1[k]
             j, k = j - 1, k + 1
     for i in range(n, size):
-        j, k = n-1, i - n + 1
+        j, k = n - 1, i - n + 1
         while j > -1 and k < m:
             ans[i] += inSignal[j] * kernel1[k]
             j, k = j - 1, k + 1
@@ -44,3 +44,25 @@ def conv2D(inImage: np.ndarray, kernel2: np.ndarray) -> np.ndarray:
                     output[r, c] += inImage[row, column] * kernel2[center - i, center + j]
     return output.clip(0, 255)
 
+
+def convDerivative(inImage: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray):
+    """
+    Calculate gradient of an image
+    :param inImage: Grayscale iamge
+    :return: (directions, magnitude,x_der,y_der)
+    """
+    shape = inImage.shape
+    der_kernel = [1, 0, -1]
+
+    x_der = np.zeros(shape, dtype=int)
+    for r in range(shape[0]):
+        x_der[r] = np.convolve(inImage[r], der_kernel, mode="same")
+
+    y_der = np.zeros(shape, dtype=int)
+    for c in range(shape[1]):
+        y_der[:, c] = np.convolve(inImage[:, c], der_kernel, mode="same")
+
+    magnitude = np.sqrt(np.power(x_der, 2) + np.power(y_der, 2))
+
+    directions = np.arctan2(y_der, x_der)
+    return directions, magnitude, x_der, y_der
