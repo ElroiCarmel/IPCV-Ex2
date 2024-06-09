@@ -1,4 +1,5 @@
 import numpy as np
+import cv2
 
 
 def conv1D(inSignal: np.ndarray, kernel1: np.ndarray) -> np.ndarray:
@@ -66,3 +67,50 @@ def convDerivative(inImage: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarray, 
 
     directions = np.arctan2(y_der, x_der)
     return directions, magnitude, x_der, y_der
+
+def getGaussianKernel(n: int) -> np.ndarray:
+    """
+    Generate a Gaussian kernel
+    :param n: The desired kernel size. N should be odd.
+    :return: An approximation of the Gaussian kernel using the binomial kernel
+    """
+    ker = np.zeros((n, n))
+
+    temp = [1]
+    for i in range(1, n):
+        temp = np.convolve(temp, [1,1])
+
+    for i in range(n):
+        ker[i] = temp[i] * temp
+
+    return ker/np.power(2, 2*n-2)
+
+
+def blurImage1(in_image: np.ndarray, kernel_size: int) -> np.ndarray:
+    """
+    Blur an image using a Gaussian kernel
+    :param inImage: Input image
+    :param kernelSize: Kernel size
+    :return: The Blurred image
+    """
+
+    gaussian_kernel = getGaussianKernel(kernel_size)
+    return conv2D(in_image, gaussian_kernel)
+
+
+def blurImage2(in_image: np.ndarray, kernel_size: int) -> np.ndarray:
+    """
+    Blur an image using a Gaussian kernel using OpenCV built-in functions
+    :param inImage: Input image
+    :param kernelSize: Kernel size
+    :return: The Blurred image
+    """
+    ker = cv2.getGaussianKernel(kernel_size, sigma=-1)
+    return cv2.filter2D(in_image, -1, ker, borderType=cv2.BORDER_REPLICATE)
+
+
+if __name__ == '__main__':
+    img = np.random.randint(0, 7*7, size=(7, 7)).astype(np.uint8)
+    print(f"Original Image:\n {img}")
+    print(f"My bur1:\n{np.round(blurImage1(img, 3))}")
+    print(f"CV2 blur2:\n{blurImage2(img, 3)}")
