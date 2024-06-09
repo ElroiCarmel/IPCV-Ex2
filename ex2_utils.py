@@ -1,5 +1,6 @@
 import numpy as np
 
+
 def conv1D(inSignal: np.ndarray, kernel1: np.ndarray) -> np.ndarray:
     """
     Convolve a 1-D array with a given kernel
@@ -23,6 +24,7 @@ def conv1D(inSignal: np.ndarray, kernel1: np.ndarray) -> np.ndarray:
             j, k = j - 1, k + 1
     return ans
 
+
 def conv2D(inImage: np.ndarray, kernel2: np.ndarray) -> np.ndarray:
     """
     Convolve a 2-D array with a given kernel
@@ -30,5 +32,15 @@ def conv2D(inImage: np.ndarray, kernel2: np.ndarray) -> np.ndarray:
     :param kernel2: kernel
     :return: The convolved image
     """
-    pass
+    h, w = inImage.shape
+    output = np.zeros((h, w))
+    center = int(kernel2.shape[0] / 2)
+
+    for r in range(h):
+        for c in range(w):
+            for i in range(-center, center + 1):
+                for j in range(-center, center + 1):
+                    row, column = np.clip(r - i, 0, h - 1), np.clip(c + j, 0, w - 1)
+                    output[r, c] += inImage[row, column] * kernel2[center - i, center + j]
+    return output.clip(0, 255)
 
