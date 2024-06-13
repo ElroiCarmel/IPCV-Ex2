@@ -89,13 +89,13 @@ def getGaussianKernel(n: int) -> np.ndarray:
 def blurImage1(in_image: np.ndarray, kernel_size: int) -> np.ndarray:
     """
     Blur an image using a Gaussian kernel
-    :param inImage: Input image
-    :param kernelSize: Kernel size
+    :param in_image: Input image
+    :param kernel_size: Kernel size
     :return: The Blurred image
     """
 
     gaussian_kernel = getGaussianKernel(kernel_size)
-    return conv2D(in_image, gaussian_kernel)
+    return conv2D(in_image, gaussian_kernel).astype(np.uint8)
 
 
 def blurImage2(in_image: np.ndarray, kernel_size: int) -> np.ndarray:
@@ -109,8 +109,38 @@ def blurImage2(in_image: np.ndarray, kernel_size: int) -> np.ndarray:
     return cv2.filter2D(in_image, -1, ker, borderType=cv2.BORDER_REPLICATE)
 
 
+def edgeDetectionSobel(img: np.ndarray, thresh: float = 0.7) -> (np.ndarray, np.ndarray):
+    """
+    Detects edges using the Sobel method
+    :param img: Input image
+    :param thresh: The minimum threshold for the edge response
+    :return: opencv solution, my implementation
+    """
+    # First my solution
+    x_ker = np.array([[-1, 0, 1],
+                      [-2, 0, 2],
+                      [-1, 0, 1]])
+    y_ker = np.array([[-1, -2, -1],
+                      [0, 0, 0],
+                      [1, 2, 1]])
+    x_der = conv2D(img, x_ker)
+    y_der = conv2D(img, y_ker)
+    magnitude = np.sqrt(np.power(x_der, 2) + np.power(y_der, 2))
+    magnitude /= 255
+    magnitude[magnitude < thresh], magnitude[magnitude >= thresh] = 0, 1
+    my_sol = np.multiply(magnitude, 255).astype(np.uint8)
+    # Open-cv solution
+    cv_sol = cv2.Sobel(img, -1, 1, 1, borderType=cv2.BORDER_REPLICATE)
+    return cv_sol, magnitude
+
+
+
 if __name__ == '__main__':
-    img = np.random.randint(0, 7*7, size=(7, 7)).astype(np.uint8)
-    print(f"Original Image:\n {img}")
-    print(f"My bur1:\n{np.round(blurImage1(img, 3))}")
-    print(f"CV2 blur2:\n{blurImage2(img, 3)}")
+    img = cv2.imread("codeMonkey.jpeg", cv2.IMREAD_GRAYSCALE)
+    # Sobel Edge detection
+    cv_sol, my = edgeDetectionSobel(img)
+    # my = np.round(np.multiply(my, 255)).clip(0, 255).astype(np.uint8)
+    # cv_sol = cv_sol / (cv_sol.max() - cv_sol.min())
+    cv2.imshow("CV solution", cv_sol)
+    cv2.imshow("My solution", my)
+    cv2.waitKey(0)
