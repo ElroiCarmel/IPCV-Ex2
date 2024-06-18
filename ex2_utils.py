@@ -49,7 +49,7 @@ def conv2D(inImage: np.ndarray, kernel2: np.ndarray) -> np.ndarray:
 def convDerivative(inImage: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarray, np.ndarray):
     """
     Calculate gradient of an image
-    :param inImage: Grayscale iamge
+    :param inImage: Grayscale image
     :return: (directions, magnitude,x_der,y_der)
     """
     shape = inImage.shape
@@ -63,7 +63,7 @@ def convDerivative(inImage: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarray, 
     for c in range(shape[1]):
         y_der[:, c] = np.convolve(inImage[:, c], der_kernel, mode="same")
 
-    magnitude = np.sqrt(np.power(x_der, 2) + np.power(y_der, 2))
+    magnitude = np.sqrt(np.power(x_der, 2) + np.power(y_der, 2)).astype(np.uint8)
 
     directions = np.arctan2(y_der, x_der)
     return directions, magnitude, x_der, y_der
@@ -95,7 +95,7 @@ def blurImage1(in_image: np.ndarray, kernel_size: int) -> np.ndarray:
     """
 
     gaussian_kernel = getGaussianKernel(kernel_size)
-    return conv2D(in_image, gaussian_kernel).astype(np.uint8)
+    return cv2.filter2D(in_image, -1, gaussian_kernel, borderType=cv2.BORDER_REPLICATE)
 
 
 def blurImage2(in_image: np.ndarray, kernel_size: int) -> np.ndarray:
@@ -123,24 +123,50 @@ def edgeDetectionSobel(img: np.ndarray, thresh: float = 0.7) -> (np.ndarray, np.
     y_ker = np.array([[-1, -2, -1],
                       [0, 0, 0],
                       [1, 2, 1]])
-    x_der = conv2D(img, x_ker)
-    y_der = conv2D(img, y_ker)
+    # I am using the cv2.filter only because it's faster!
+    x_der = cv2.filter2D(img, cv2.CV_64F, x_ker, borderType=cv2.BORDER_REPLICATE)
+    y_der = cv2.filter2D(img, cv2.CV_64F, y_ker, borderType=cv2.BORDER_REPLICATE)
     magnitude = np.sqrt(np.power(x_der, 2) + np.power(y_der, 2))
     magnitude /= 255
-    magnitude[magnitude < thresh], magnitude[magnitude >= thresh] = 0, 1
-    my_sol = np.multiply(magnitude, 255).astype(np.uint8)
+    magnitude[magnitude < thresh], magnitude[magnitude >= thresh] = 0, 255
     # Open-cv solution
     cv_sol = cv2.Sobel(img, -1, 1, 1, borderType=cv2.BORDER_REPLICATE)
-    return cv_sol, magnitude
+    return cv_sol, magnitude.astype(np.uint8)
+
+
+def edgeDetectionZeroCrossingSimple(img: np.ndarray) -> np.ndarray:
+    """
+    Detecting edges using the "ZeroCrossing" method
+    :param img: Input image
+    :return: Edge matrix
+    """
+    # youtube.com/watch?v=uNP6ZwQ3r6A
+    kernel = np.array([[0, 1, 0],
+                       [1, -4, 1],
+                       [0, 1, 0]])
+    der = cv2.filter2D(img, cv2.CV_16S, kernel, borderType=cv2.BORDER_REPLICATE)
+    pos_mask = der > 0
+    zero_crossing_x = np.logical_xor(pos_mask[:, 1:], pos_mask[:, :-1])
+    zero_crossing_y = np.logical_xor(pos_mask[1:, :], pos_mask[:-1, :])
+
+    zero_crossings = np.zeros_like(img, dtype=bool)
+    zero_crossings[:, 1:] |= zero_crossing_x
+    zero_crossings[1:, :] |= zero_crossing_y
+
+    ans = np.where(zero_crossings, 255, 0).astype(np.uint8)
+    return ans
+
+
+def edgeDetectionZeroCrossingLOG(img: np.ndarray) -> np.ndarray:
+    """
+    Detects edges using the "ZeroCrossingLOG" method
+    :param img: Input image
+    :return: Edge map
+    """
+    return edgeDetectionZeroCrossingSimple(blurImage1(img, 21))
+
 
 
 
 if __name__ == '__main__':
-    img = cv2.imread("codeMonkey.jpeg", cv2.IMREAD_GRAYSCALE)
-    # Sobel Edge detection
-    cv_sol, my = edgeDetectionSobel(img)
-    # my = np.round(np.multiply(my, 255)).clip(0, 255).astype(np.uint8)
-    # cv_sol = cv_sol / (cv_sol.max() - cv_sol.min())
-    cv2.imshow("CV solution", cv_sol)
-    cv2.imshow("My solution", my)
-    cv2.waitKey(0)
+    img = cv2.imread('codeMonkey.jpeg', cv2.IMREAD_GRAYSCALE)
