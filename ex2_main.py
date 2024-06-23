@@ -1,5 +1,3 @@
-import cv2
-
 from ex2_utils import *
 import matplotlib.pyplot as plt
 import time
@@ -70,4 +68,8 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    # main()
+    print("cv2" in dir())
+    arr = np.arange(1,10).reshape(3,-1)
+    print(arr)
+    print(f"Flipped: {np.flip(arr)}")

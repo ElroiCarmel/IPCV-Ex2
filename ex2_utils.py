@@ -63,10 +63,11 @@ def convDerivative(inImage: np.ndarray) -> (np.ndarray, np.ndarray, np.ndarray, 
     for c in range(shape[1]):
         y_der[:, c] = np.convolve(inImage[:, c], der_kernel, mode="same")
 
-    magnitude = np.sqrt(np.power(x_der, 2) + np.power(y_der, 2)).astype(np.uint8)
+    magnitude = np.sqrt(np.power(x_der, 2) + np.power(y_der, 2))
 
     directions = np.arctan2(y_der, x_der)
     return directions, magnitude, x_der, y_der
+
 
 def getGaussianKernel(n: int) -> np.ndarray:
     """
@@ -78,12 +79,12 @@ def getGaussianKernel(n: int) -> np.ndarray:
 
     temp = [1]
     for i in range(1, n):
-        temp = np.convolve(temp, [1,1])
+        temp = np.convolve(temp, [1, 1])
 
     for i in range(n):
         ker[i] = temp[i] * temp
 
-    return ker/np.power(2, 2*n-2)
+    return ker / np.power(2, 2 * n - 2)
 
 
 def blurImage1(in_image: np.ndarray, kernel_size: int) -> np.ndarray:
@@ -128,7 +129,7 @@ def edgeDetectionSobel(img: np.ndarray, thresh: float = 0.7) -> (np.ndarray, np.
     y_der = cv2.filter2D(img, cv2.CV_64F, y_ker, borderType=cv2.BORDER_REPLICATE)
     magnitude = np.sqrt(np.power(x_der, 2) + np.power(y_der, 2))
     magnitude /= 255
-    magnitude[magnitude < thresh], magnitude[magnitude >= thresh] = 0, 255
+    magnitude = np.where(magnitude < thresh, 0, 255)
     # Open-cv solution
     cv_sol = cv2.Sobel(img, -1, 1, 1, borderType=cv2.BORDER_REPLICATE)
     return cv_sol, magnitude.astype(np.uint8)
@@ -163,10 +164,108 @@ def edgeDetectionZeroCrossingLOG(img: np.ndarray) -> np.ndarray:
     :param img: Input image
     :return: Edge map
     """
-    return edgeDetectionZeroCrossingSimple(blurImage1(img, 21))
+    return edgeDetectionZeroCrossingSimple(blurImage1(img, 15))
 
 
+def edgeDetectionCanny(img: np.ndarray, thrs_high: float, thrs_low: float) -> (np.ndarray, np.ndarray):
+    """
+    Detecting edges usint "Canny Edge" method
+    :param img: Input image
+    :param thrs_high: T1
+    :param thrs_low: T2
+    :return: opencv solution, my implementation
+    """
+    # 1. Smooth the image with a Gaussian kernel
+    smoothed = blurImage2(img, 5)
+    # 2. Compute the partial derivatives lx, ly
+    #   - Use simple derivative kernels
+
+    # 3. Compute the magnitude and the direction of the gradients
+    directions, magnitude, _, _ = convDerivative(smoothed)
+    # 4. Quantize the gradient directions
+    # Convert to from radians to degree
+    directions = np.rad2deg(directions)
+    # Since directions can be negative apply module
+    directions = np.mod(directions, 180)
+    # Round to the nearest 45 degree
+    directions = np.round(directions / 45) * 45
+    directions = directions.astype(int)
+    # 5. Perform non-maximum suppression
+    h, w = magnitude.shape
+    for i in range(1, h - 1):
+        for j in range(1, w - 1):
+            deg = directions[i, j]
+            x_mov, y_mov = conv_degree(deg)
+            mag = magnitude[i, j]
+            adjacent = magnitude[[i, i+y_mov, i-y_mov], [j, i+x_mov, j-x_mov]]
+            if mag != np.max(adjacent):
+                magnitude[i, j] = 0
+    # 6. Hysteresis
+    max_mag = np.max(magnitude)
+    magnitude = magnitude / max_mag # Normalize
+    for i in range(1, h - 1):
+        for j in range(1, w - 1):
+            mag = magnitude[i, j]
+            if mag >= thrs_high:
+                continue
+            elif mag < thrs_low:
+                magnitude[i, j] = 0
+            else:
+                adjacent = magnitude[i-1:i+2, j-1:j+2]
+                if np.sum(adjacent) - mag <= 0:
+                    magnitude[i, j] = 0
+    magnitude[magnitude != 0] = 255
+    cv_sol = cv2.Canny(img, thrs_low * max_mag, thrs_high * max_mag)
+    return cv_sol, magnitude.astype(np.uint8)
+
+def conv_degree(degree: int) -> (int, int):
+    """
+    Helper function to convert a degree to movement on the x and y axes
+    :param degree: 0/45//90/135/180
+    :return: a tuple (x, y) which represents the movement
+    """
+    if degree == 0:
+        return 1, 0
+    elif degree == 45:
+        return 1, -1
+    elif degree == 90:
+        return 0, -1
+    elif degree == 135:
+        return -1, -1
+    elif degree == 180:
+        return -1, 0
 
 
-if __name__ == '__main__':
-    img = cv2.imread('codeMonkey.jpeg', cv2.IMREAD_GRAYSCALE)
+def houghCircles(img: np.ndarray, min_radius: int, max_radius: int) -> list:
+    """
+    Find Circles in an image using a Hough Transform algorithm extension
+    :param img: Input image
+    :param min_radius: Minimum circle radius
+    :param max_radius: Maximum circle radius
+    :return: A list containing the detected circles,
+    [(x,y,radius),(x,y,radius),...]
+    """
+    edges = cv2.Canny(img, 500, 800)
+    h, w = img.shape
+    edge_mask = edges > 0
+    y_indices, x_indices = np.indices((h, w))
+    y_indices, x_indices = y_indices[edge_mask], x_indices[edge_mask]
+    votes = np.zeros(shape=(h, w, max_radius - min_radius + 1), dtype=int)
+
+    for radius in range(min_radius, max_radius + 1):
+        for theta in range(360):
+            x_circle = x_indices + radius * np.cos(theta)
+            y_circle = y_indices - radius * np.sin(theta)
+            x_circle = np.round(x_circle).astype(int)
+            y_circle = np.round(y_circle).astype(int)
+            mask_y, mask_x = np.logical_and(y_circle >= 0, y_circle < h), np.logical_and(x_circle >= 0, x_circle < w)
+            mask_common = np.logical_and(mask_y, mask_x)
+            votes[y_circle[mask_common], x_circle[mask_common], radius - min_radius] += 1
+
+
+    ans = []
+    for i in range(max_radius-min_radius+1):
+        ans.append(votes[:,:,i].copy().astype(np.uint8))
+    return ans
+
+
