@@ -8,6 +8,7 @@ def conv1Demo():
     b = np.array([1, 2, 3])
     print(f"My convolution: {conv1D(a, b)}")
     print(f"Numpy convolution: {np.convolve(a, b)}")
+    plt.ims
 
 
 def conv2Demo():
@@ -55,7 +56,12 @@ def edgeDemo():
 
 
 def houghDemo():
-    pass
+    img = cv2.imread('pool_balls.jpeg', cv2.IMREAD_GRAYSCALE)
+    min_radius, max_radius = 15, 25
+    circles = houghCircles(img, min_radius, max_radius)
+    for circle in circles:
+        plt.imshow(circle.astype(np.uint8), cmap='gray')
+        plt.show()
 
 
 def main():
@@ -63,13 +69,9 @@ def main():
     # conv2Demo()
     # derivDemo()
     # blurDemo()
-    edgeDemo()
+    # edgeDemo()
     houghDemo()
 
 
 if __name__ == '__main__':
-    # main()
-    print("cv2" in dir())
-    arr = np.arange(1,10).reshape(3,-1)
-    print(arr)
-    print(f"Flipped: {np.flip(arr)}")
+    main()

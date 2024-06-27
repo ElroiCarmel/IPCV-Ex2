@@ -1,3 +1,4 @@
+import matplotlib.pyplot as plt
 import numpy as np
 import cv2
 
@@ -128,7 +129,7 @@ def edgeDetectionSobel(img: np.ndarray, thresh: float = 0.7) -> (np.ndarray, np.
     x_der = cv2.filter2D(img, cv2.CV_64F, x_ker, borderType=cv2.BORDER_REPLICATE)
     y_der = cv2.filter2D(img, cv2.CV_64F, y_ker, borderType=cv2.BORDER_REPLICATE)
     magnitude = np.sqrt(np.power(x_der, 2) + np.power(y_der, 2))
-    magnitude /= 255
+    magnitude /= (magnitude.max() - magnitude.min())
     magnitude = np.where(magnitude < thresh, 0, 255)
     # Open-cv solution
     cv_sol = cv2.Sobel(img, -1, 1, 1, borderType=cv2.BORDER_REPLICATE)
@@ -202,7 +203,7 @@ def edgeDetectionCanny(img: np.ndarray, thrs_high: float, thrs_low: float) -> (n
                 magnitude[i, j] = 0
     # 6. Hysteresis
     max_mag = np.max(magnitude)
-    magnitude = magnitude / max_mag # Normalize
+    magnitude = magnitude / max_mag  # Normalize
     for i in range(1, h - 1):
         for j in range(1, w - 1):
             mag = magnitude[i, j]
@@ -245,7 +246,9 @@ def houghCircles(img: np.ndarray, min_radius: int, max_radius: int) -> list:
     :return: A list containing the detected circles,
     [(x,y,radius),(x,y,radius),...]
     """
-    edges = cv2.Canny(img, 500, 800)
+    edges = cv2.Canny(img, 50, 100)
+
+
     h, w = img.shape
     edge_mask = edges > 0
     y_indices, x_indices = np.indices((h, w))
@@ -267,5 +270,3 @@ def houghCircles(img: np.ndarray, min_radius: int, max_radius: int) -> list:
     for i in range(max_radius-min_radius+1):
         ans.append(votes[:,:,i].copy().astype(np.uint8))
     return ans
-
-
